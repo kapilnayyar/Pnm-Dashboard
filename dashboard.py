@@ -10,6 +10,27 @@ import os
 
 st.set_page_config(page_title="PNM Activation Funnel", layout="centered")
 
+# ── Wiom Email Login ──────────────────────────────────────────────────────────
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.markdown("""
+    <div style="background:#1F3864;color:white;padding:16px;border-radius:8px;
+    text-align:center;font-size:18px;font-weight:bold;margin-bottom:24px">
+    PNM ACTIVATION FUNNEL — WIOM INTERNAL
+    </div>
+    """, unsafe_allow_html=True)
+    email = st.text_input("Enter your Wiom email")
+    if st.button("Login"):
+        if email.strip().lower().endswith("@wiom.in") or email.strip().lower().endswith("@i2e1.com"):
+            st.session_state.authenticated = True
+            st.session_state.user_email = email.strip().lower()
+            st.rerun()
+        else:
+            st.error("Access restricted to @wiom.in and @i2e1.com email addresses only.")
+    st.stop()
+
 # Auto-refresh every 30 seconds
 st_autorefresh(interval=30000)
 
