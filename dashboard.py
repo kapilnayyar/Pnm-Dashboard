@@ -10,6 +10,16 @@ import os
 
 st.set_page_config(page_title="PNM Activation Funnel", layout="centered")
 
+# Hide GitHub icon, toolbar, and footer
+st.markdown("""
+<style>
+[data-testid="stToolbar"] {visibility: hidden !important;}
+[data-testid="stDecoration"] {display: none !important;}
+footer {visibility: hidden !important;}
+#MainMenu {visibility: hidden !important;}
+</style>
+""", unsafe_allow_html=True)
+
 # ── Login / Logout ────────────────────────────────────────────────────────────
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -73,13 +83,15 @@ if not st.session_state.authenticated:
                 st.rerun()
     st.stop()
 
-# ── Logout button (sidebar) ───────────────────────────────────────────────────
-with st.sidebar:
+# ── Top bar: title + logout ───────────────────────────────────────────────────
+col_title, col_logout = st.columns([5, 1])
+with col_title:
     st.markdown(
-        f"<div style='font-size:13px;color:#555;margin-bottom:8px'>"
-        f"Logged in as<br><b>{st.session_state.get('user_email','')}</b></div>",
+        "<div style='font-size:20px;font-weight:bold;color:#1F3864;padding-top:6px'>"
+        "PNM Activation Funnel</div>",
         unsafe_allow_html=True
     )
+with col_logout:
     if st.button("Logout", use_container_width=True):
         st.session_state.authenticated = False
         st.session_state.user_email = ""
