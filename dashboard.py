@@ -5,7 +5,6 @@ from google.oauth2.service_account import Credentials
 from collections import Counter
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
-from streamlit_cookies_controller import CookieController
 import json
 import os
 
@@ -28,18 +27,11 @@ ALLOWED_EMAILS = {
     "sangeeta.kumari@wiom.in",
 }
 
-# ── Cookie-based persistent login ────────────────────────────────────────────
-cookies = CookieController()
-
-# Restore session from cookie if not already authenticated
-if not st.session_state.get("authenticated"):
-    saved_email = cookies.get("pnm_auth_email")
-    if saved_email and saved_email in ALLOWED_EMAILS:
-        st.session_state.authenticated = True
-        st.session_state.user_email = saved_email
-
 # ── Login page ────────────────────────────────────────────────────────────────
-if not st.session_state.get("authenticated"):
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
     st.markdown("""
     <style>
     .login-title {
@@ -82,7 +74,6 @@ if not st.session_state.get("authenticated"):
             elif password.strip() != correct_pw.strip():
                 st.error("Incorrect password. Please try again.")
             else:
-                cookies.set("pnm_auth_email", clean_email, max_age=60*60*24*30)  # 30 days
                 st.session_state.authenticated = True
                 st.session_state.user_email = clean_email
                 st.rerun()
@@ -98,7 +89,6 @@ with col_title:
     )
 with col_logout:
     if st.button("Logout", use_container_width=True):
-        cookies.remove("pnm_auth_email")
         st.session_state.authenticated = False
         st.session_state.user_email = ""
         st.rerun()

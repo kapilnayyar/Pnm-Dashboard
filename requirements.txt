@@ -1,6 +1,5 @@
 streamlit
 streamlit-autorefresh
-streamlit-cookies-controller
 requests
 pandas
 gspread
