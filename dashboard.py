@@ -20,13 +20,6 @@ footer {visibility: hidden !important;}
 </style>
 """, unsafe_allow_html=True)
 
-# ── Whitelisted emails ────────────────────────────────────────────────────────
-ALLOWED_EMAILS = {
-    "kapil.nayyar@wiom.in",
-    "shariq.khan@wiom.in",
-    "sangeeta.kumari@wiom.in",
-}
-
 # ── Login page ────────────────────────────────────────────────────────────────
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
@@ -69,8 +62,10 @@ if not st.session_state.authenticated:
                 correct_pw = os.getenv("APP_PASSWORD", "")
 
             clean_email = email.strip().lower()
-            if clean_email not in ALLOWED_EMAILS:
-                st.error("Your email is not authorised to access this dashboard.")
+            valid_domain = clean_email.endswith("@wiom.in") or clean_email.endswith("@i2e1.com")
+
+            if not valid_domain:
+                st.error("Access restricted to @wiom.in and @i2e1.com emails only.")
             elif password.strip() != correct_pw.strip():
                 st.error("Incorrect password. Please try again.")
             else:
