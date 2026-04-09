@@ -153,7 +153,7 @@ def fetch_sheet(sheet_id, gcp_creds):
     sheet  = client.open_by_key(sheet_id).sheet1
 
     col_a = sheet.col_values(1)[1:]   # Partner Account IDs
-    col_n = sheet.col_values(14)[1:]  # Calling status (Remarks Dropdown)
+    col_n = sheet.col_values(15)[1:]  # Calling status (Remarks Dropdown — column O)
     col_p = sheet.col_values(16)[1:]  # PSH Remark
 
     col_n = ["Appointment Scheduled" if v == "Appointment Confirmed" else v for v in col_n]
