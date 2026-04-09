@@ -277,13 +277,6 @@ def build(calling, railway, partner_calling, partner_activation, userbase_map):
     dnp_pids      = {pid for pid, s in partner_calling.items() if s == "DNP"}
     nc_pids       = {pid for pid, s in partner_calling.items() if s == "Not Contactable"}
 
-    # Activation partner sets (from Railway)
-    act_pids      = {pid for pid, s in partner_activation.items() if s == "activation_done"}
-    resch_pids    = {pid for pid, s in partner_activation.items() if s == "rescheduled"}
-    denied_p_pids = {pid for pid, s in partner_activation.items() if s == "denied"}
-    na_pids       = {pid for pid, s in partner_activation.items() if s == "not_available"}
-    ytv_pids      = appt_pids - act_pids - resch_pids - denied_p_pids - na_pids
-
     return {
         "eligible":        (ELIGIBLE,      ub(all_pids,       userbase_map)),
         "calls_made":      (calls_made,    ub(called_pids,    userbase_map)),
@@ -300,12 +293,13 @@ def build(calling, railway, partner_calling, partner_activation, userbase_map):
         "ns_shifted":      (calling.get("Shifted to Other Partner", 0), ub(shifted_pids, userbase_map)),
         "ns_mail":         (calling["Px Asking Details on Mail"],ub(mail_pids,    userbase_map)),
         "ns_wrong":        (calling["Wrong Number"],             ub(wrong_pids,   userbase_map)),
-        "pnm_activated":   (pnm_activated, ub(act_pids,       userbase_map)),
-        "not_activated":   (max(appt_sched - pnm_activated, 0), ub(appt_pids - act_pids, userbase_map)),
-        "yet_to_visit":    (yet_to_visit,  ub(ytv_pids,       userbase_map)),
-        "rescheduled":     (rescheduled,   ub(resch_pids,     userbase_map)),
-        "denied_pnm":      (denied_pnm,    ub(denied_p_pids,  userbase_map)),
-        "not_available":   (not_available, ub(na_pids,        userbase_map)),
+        # Activation rows — Railway IDs don't match Snowflake, show — for all
+        "pnm_activated":   (pnm_activated, "—"),
+        "not_activated":   (max(appt_sched - pnm_activated, 0), "—"),
+        "yet_to_visit":    (yet_to_visit,  "—"),
+        "rescheduled":     (rescheduled,   "—"),
+        "denied_pnm":      (denied_pnm,    "—"),
+        "not_available":   (not_available, "—"),
     }
 
 # ── HTML rows (3 columns: METRIC | COUNT | USERBASE) ─────────────────────────
