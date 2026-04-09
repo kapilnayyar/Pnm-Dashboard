@@ -10,26 +10,80 @@ import os
 
 st.set_page_config(page_title="PNM Activation Funnel", layout="centered")
 
-# ── Wiom Email Login ──────────────────────────────────────────────────────────
+# ── Login / Logout ────────────────────────────────────────────────────────────
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
     st.markdown("""
-    <div style="background:#1F3864;color:white;padding:16px;border-radius:8px;
-    text-align:center;font-size:18px;font-weight:bold;margin-bottom:24px">
-    PNM ACTIVATION FUNNEL — WIOM INTERNAL
-    </div>
+    <style>
+    .login-box {
+        max-width: 400px;
+        margin: 60px auto 0 auto;
+        padding: 36px 32px 28px 32px;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+    }
+    .login-title {
+        background: #1F3864;
+        color: white;
+        padding: 16px;
+        border-radius: 8px;
+        text-align: center;
+        font-size: 18px;
+        font-weight: bold;
+        margin-bottom: 8px;
+    }
+    .login-sub {
+        text-align: center;
+        color: #555;
+        font-size: 13px;
+        margin-bottom: 24px;
+    }
+    </style>
+    <div class="login-title">PNM ACTIVATION FUNNEL</div>
+    <div class="login-sub">Wiom Internal Dashboard — Restricted Access</div>
     """, unsafe_allow_html=True)
-    email = st.text_input("Enter your Wiom email")
-    if st.button("Login"):
-        if email.strip().lower().endswith("@wiom.in") or email.strip().lower().endswith("@i2e1.com"):
-            st.session_state.authenticated = True
-            st.session_state.user_email = email.strip().lower()
-            st.rerun()
-        else:
-            st.error("Access restricted to @wiom.in and @i2e1.com email addresses only.")
+
+    col1, col2, col3 = st.columns([1, 3, 1])
+    with col2:
+        email    = st.text_input("Wiom Email", placeholder="name@wiom.in")
+        password = st.text_input("Password", type="password")
+
+        if st.button("Login", use_container_width=True):
+            try:
+                correct_pw = st.secrets["APP_PASSWORD"]
+            except Exception:
+                from dotenv import load_dotenv
+                load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+                correct_pw = os.getenv("APP_PASSWORD", "")
+
+            valid_email = (
+                email.strip().lower().endswith("@wiom.in") or
+                email.strip().lower().endswith("@i2e1.com")
+            )
+            if not valid_email:
+                st.error("Access restricted to @wiom.in and @i2e1.com emails only.")
+            elif password != correct_pw:
+                st.error("Incorrect password. Please try again.")
+            else:
+                st.session_state.authenticated = True
+                st.session_state.user_email = email.strip().lower()
+                st.rerun()
     st.stop()
+
+# ── Logout button (sidebar) ───────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown(
+        f"<div style='font-size:13px;color:#555;margin-bottom:8px'>"
+        f"Logged in as<br><b>{st.session_state.get('user_email','')}</b></div>",
+        unsafe_allow_html=True
+    )
+    if st.button("Logout", use_container_width=True):
+        st.session_state.authenticated = False
+        st.session_state.user_email = ""
+        st.rerun()
 
 # Auto-refresh every 30 seconds
 st_autorefresh(interval=30000)
