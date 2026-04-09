@@ -174,7 +174,7 @@ def fetch_userbase(metabase_url, api_key):
         yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
         query = (
             f"select partner_account_id, sum(ACTIVE_R15_CUSTOMERS) as active_customers "
-            f"from customer_base where dt = '{yesterday}' group by all"
+            f"from customer_base where DATE = '{yesterday}' group by all"
         )
         resp = requests.post(
             f"{metabase_url}/api/dataset",
