@@ -225,8 +225,14 @@ def fetch_railway(url, email, password):
         return None, {}, str(e)
 
 # ── Sum userbase for a set of partner IDs ────────────────────────────────────
+def ub_raw(partner_ids, userbase_map):
+    return sum(userbase_map.get(pid, 0) for pid in partner_ids)
+
 def ub(partner_ids, userbase_map):
-    total = sum(userbase_map.get(pid, 0) for pid in partner_ids)
+    total = ub_raw(partner_ids, userbase_map)
+    return f"{total:,}" if total > 0 else "—"
+
+def ub_fmt(total):
     return f"{total:,}" if total > 0 else "—"
 
 # ── Build funnel numbers ──────────────────────────────────────────────────────
@@ -276,7 +282,16 @@ def build(calling, railway, partner_calling, partner_activation, userbase_map):
     resch_pids    = {pid for pid, s in partner_activation.items() if s == "rescheduled"}
     denied_p_pids = {pid for pid, s in partner_activation.items() if s == "denied"}
     na_pids       = {pid for pid, s in partner_activation.items() if s == "not_available"}
-    ytv_pids      = set(partner_activation.keys()) - act_pids - resch_pids - denied_p_pids - na_pids
+
+    # Yet to Visit userbase = Appt Scheduled UB - Activated UB - Rescheduled UB - Denied UB - Not Available UB
+    # Same arithmetic logic as the partner count
+    appt_ub  = ub_raw(appt_pids,      userbase_map)
+    act_ub   = ub_raw(act_pids,       userbase_map)
+    resch_ub = ub_raw(resch_pids,     userbase_map)
+    deny_ub  = ub_raw(denied_p_pids,  userbase_map)
+    na_ub    = ub_raw(na_pids,        userbase_map)
+    ytv_ub   = max(appt_ub - act_ub - resch_ub - deny_ub - na_ub, 0)
+    not_act_ub = max(appt_ub - act_ub, 0)
 
     return {
         "eligible":        (ELIGIBLE,      ub(all_pids,       userbase_map)),
@@ -294,12 +309,12 @@ def build(calling, railway, partner_calling, partner_activation, userbase_map):
         "ns_shifted":      (calling.get("Shifted to Other Partner", 0), ub(shifted_pids, userbase_map)),
         "ns_mail":         (calling["Px Asking Details on Mail"],ub(mail_pids,    userbase_map)),
         "ns_wrong":        (calling["Wrong Number"],             ub(wrong_pids,   userbase_map)),
-        "pnm_activated":   (pnm_activated,                      ub(act_pids,                                        userbase_map)),
-        "not_activated":   (max(appt_sched - pnm_activated, 0), ub(resch_pids | denied_p_pids | na_pids | ytv_pids, userbase_map)),
-        "yet_to_visit":    (yet_to_visit,                       ub(ytv_pids,                                        userbase_map)),
-        "rescheduled":     (rescheduled,                        ub(resch_pids,                                      userbase_map)),
-        "denied_pnm":      (denied_pnm,                        ub(denied_p_pids,                                   userbase_map)),
-        "not_available":   (not_available,                      ub(na_pids,                                         userbase_map)),
+        "pnm_activated":   (pnm_activated,                      ub_fmt(act_ub)),
+        "not_activated":   (max(appt_sched - pnm_activated, 0), ub_fmt(not_act_ub)),
+        "yet_to_visit":    (yet_to_visit,                       ub_fmt(ytv_ub)),
+        "rescheduled":     (rescheduled,                        ub_fmt(resch_ub)),
+        "denied_pnm":      (denied_pnm,                        ub_fmt(deny_ub)),
+        "not_available":   (not_available,                      ub_fmt(na_ub)),
     }
 
 # ── HTML rows (3 columns: METRIC | COUNT | USERBASE) ─────────────────────────
