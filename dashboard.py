@@ -5,6 +5,7 @@ from google.oauth2.service_account import Credentials
 from collections import Counter
 from datetime import datetime
 from streamlit_autorefresh import st_autorefresh
+from streamlit_cookies_controller import CookieController
 import json
 import os
 
@@ -20,21 +21,27 @@ footer {visibility: hidden !important;}
 </style>
 """, unsafe_allow_html=True)
 
-# ── Login / Logout ────────────────────────────────────────────────────────────
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
+# ── Whitelisted emails ────────────────────────────────────────────────────────
+ALLOWED_EMAILS = {
+    "kapil.nayyar@wiom.in",
+    "shariq.khan@wiom.in",
+    "sangeeta.kumari@wiom.in",
+}
 
-if not st.session_state.authenticated:
+# ── Cookie-based persistent login ────────────────────────────────────────────
+cookies = CookieController()
+
+# Restore session from cookie if not already authenticated
+if not st.session_state.get("authenticated"):
+    saved_email = cookies.get("pnm_auth_email")
+    if saved_email and saved_email in ALLOWED_EMAILS:
+        st.session_state.authenticated = True
+        st.session_state.user_email = saved_email
+
+# ── Login page ────────────────────────────────────────────────────────────────
+if not st.session_state.get("authenticated"):
     st.markdown("""
     <style>
-    .login-box {
-        max-width: 400px;
-        margin: 60px auto 0 auto;
-        padding: 36px 32px 28px 32px;
-        background: #ffffff;
-        border-radius: 12px;
-        box-shadow: 0 4px 24px rgba(0,0,0,0.10);
-    }
     .login-title {
         background: #1F3864;
         color: white;
@@ -69,17 +76,15 @@ if not st.session_state.authenticated:
                 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
                 correct_pw = os.getenv("APP_PASSWORD", "")
 
-            valid_email = (
-                email.strip().lower().endswith("@wiom.in") or
-                email.strip().lower().endswith("@i2e1.com")
-            )
-            if not valid_email:
-                st.error("Access restricted to @wiom.in and @i2e1.com emails only.")
-            elif password != correct_pw:
+            clean_email = email.strip().lower()
+            if clean_email not in ALLOWED_EMAILS:
+                st.error("Your email is not authorised to access this dashboard.")
+            elif password.strip() != correct_pw.strip():
                 st.error("Incorrect password. Please try again.")
             else:
+                cookies.set("pnm_auth_email", clean_email, max_age=60*60*24*30)  # 30 days
                 st.session_state.authenticated = True
-                st.session_state.user_email = email.strip().lower()
+                st.session_state.user_email = clean_email
                 st.rerun()
     st.stop()
 
@@ -93,6 +98,7 @@ with col_title:
     )
 with col_logout:
     if st.button("Logout", use_container_width=True):
+        cookies.remove("pnm_auth_email")
         st.session_state.authenticated = False
         st.session_state.user_email = ""
         st.rerun()
