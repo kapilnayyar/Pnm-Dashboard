@@ -8,6 +8,8 @@ from streamlit_autorefresh import st_autorefresh
 import json
 import os
 import hashlib
+import io
+import pandas as pd
 
 _TOKEN_SALT = "pnm-wiom-dashboard-2024"
 
@@ -105,13 +107,26 @@ if not st.session_state.authenticated:
                 st.rerun()
     st.stop()
 
-# ── Top bar: title + logout ───────────────────────────────────────────────────
-col_title, col_logout = st.columns([5, 1])
+# ── Top bar: title + download + logout ───────────────────────────────────────
+col_title, col_download, col_logout = st.columns([5, 1.8, 1])
 with col_title:
     st.markdown(
         "<div style='font-size:20px;font-weight:bold;color:#1F3864;padding-top:6px'>"
         "PNM Activation Funnel</div>",
         unsafe_allow_html=True
+    )
+with col_download:
+    secrets = get_secrets()
+    excel_bytes = build_excel_bytes(
+        secrets["sheet_id"], secrets["gcp_creds"],
+        secrets["railway_url"], secrets["railway_email"], secrets["railway_pass"]
+    )
+    st.download_button(
+        label="⬇ Download Excel",
+        data=excel_bytes,
+        file_name=f"PNM_Activation_{datetime.now().strftime('%d%b%Y')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
     )
 with col_logout:
     if st.button("Logout", use_container_width=True):
@@ -256,6 +271,41 @@ def fetch_railway(url, email, password):
         return counts, partner_activation, None
     except Exception as e:
         return None, {}, str(e)
+
+# ── Build Excel: Partner ID, Partner Name, PNM Activation ────────────────────
+@st.cache_data(ttl=30)
+def build_excel_bytes(sheet_id, gcp_creds, railway_url, railway_email, railway_pass):
+    # Fetch Partner ID + Partner Name from Google Sheet
+    creds = Credentials.from_service_account_info(
+        gcp_creds,
+        scopes=[
+            "https://www.googleapis.com/auth/spreadsheets.readonly",
+            "https://www.googleapis.com/auth/drive.readonly"
+        ]
+    )
+    client = gspread.authorize(creds)
+    sheet  = client.open_by_key(sheet_id).sheet1
+    col_a  = sheet.col_values(1)[1:]   # Partner IDs
+    col_b  = sheet.col_values(2)[1:]   # Partner Names
+
+    # Fetch activation status from Railway
+    _, partner_activation, _ = fetch_railway(railway_url, railway_email, railway_pass)
+
+    rows = []
+    for pid, name in zip(col_a, col_b):
+        pid  = str(pid).strip()
+        name = str(name).strip()
+        if not pid:
+            continue
+        status     = partner_activation.get(pid, "")
+        activation = "Yes" if status == "activation_done" else "No"
+        rows.append({"Partner ID": pid, "Partner Name": name, "PNM Activation": activation})
+
+    df = pd.DataFrame(rows)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="PNM Activation")
+    return output.getvalue()
 
 # ── Sum userbase for a set of partner IDs ────────────────────────────────────
 def ub_raw(partner_ids, userbase_map):
