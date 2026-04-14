@@ -11,10 +11,13 @@ import hashlib
 import io
 import pandas as pd
 
+# ─────────────────────────────────────────────────────────────────────────────
+# ALL FUNCTION DEFINITIONS (must come before any module-level calls)
+# ─────────────────────────────────────────────────────────────────────────────
+
 _TOKEN_SALT = "pnm-wiom-dashboard-2024"
 
 def _load_app_password():
-    """Load APP_PASSWORD from Streamlit secrets or local .env."""
     try:
         return st.secrets["APP_PASSWORD"]
     except Exception:
@@ -23,21 +26,19 @@ def _load_app_password():
         return os.getenv("APP_PASSWORD", "")
 
 def _make_token(email, correct_pw):
-    """Create a URL-safe session token from email + password hash."""
     raw = f"{email}|{correct_pw}|{_TOKEN_SALT}"
     return hashlib.sha256(raw.encode()).hexdigest()
 
-# ── Credentials ───────────────────────────────────────────────────────────────
 def get_secrets():
     try:
         return {
-            "railway_url":    st.secrets["RAILWAY_APP_URL"],
-            "railway_email":  st.secrets["RAILWAY_EMAIL"],
-            "railway_pass":   st.secrets["RAILWAY_PASSWORD"],
-            "sheet_id":       st.secrets["GOOGLE_SHEET_ID"],
-            "gcp_creds":      dict(st.secrets["gcp_service_account"]),
-            "metabase_url":   st.secrets["METABASE_URL"],
-            "metabase_key":   st.secrets["METABASE_API_KEY"],
+            "railway_url":   st.secrets["RAILWAY_APP_URL"],
+            "railway_email": st.secrets["RAILWAY_EMAIL"],
+            "railway_pass":  st.secrets["RAILWAY_PASSWORD"],
+            "sheet_id":      st.secrets["GOOGLE_SHEET_ID"],
+            "gcp_creds":     dict(st.secrets["gcp_service_account"]),
+            "metabase_url":  st.secrets["METABASE_URL"],
+            "metabase_key":  st.secrets["METABASE_API_KEY"],
         }
     except Exception:
         from dotenv import load_dotenv
@@ -58,135 +59,6 @@ def get_secrets():
             "metabase_key":  os.getenv("METABASE_API_KEY", ""),
         }
 
-st.set_page_config(page_title="PNM Activation Funnel", layout="centered")
-
-# Hide GitHub icon, toolbar, and footer
-st.markdown("""
-<style>
-[data-testid="stToolbar"] {visibility: hidden !important;}
-[data-testid="stDecoration"] {display: none !important;}
-footer {visibility: hidden !important;}
-#MainMenu {visibility: hidden !important;}
-</style>
-""", unsafe_allow_html=True)
-
-# ── Login page ────────────────────────────────────────────────────────────────
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-# Auto-restore session from URL token (survives Streamlit server restarts)
-if not st.session_state.authenticated:
-    _params = st.query_params
-    _e = _params.get("e", "")
-    _t = _params.get("t", "")
-    if _e and _t:
-        _correct_pw = _load_app_password()
-        _valid_domain = _e.endswith("@wiom.in") or _e.endswith("@i2e1.com")
-        if _valid_domain and _t == _make_token(_e, _correct_pw):
-            st.session_state.authenticated = True
-            st.session_state.user_email = _e
-
-if not st.session_state.authenticated:
-    st.markdown("""
-    <style>
-    .login-title {
-        background: #1F3864;
-        color: white;
-        padding: 16px;
-        border-radius: 8px;
-        text-align: center;
-        font-size: 18px;
-        font-weight: bold;
-        margin-bottom: 8px;
-    }
-    .login-sub {
-        text-align: center;
-        color: #555;
-        font-size: 13px;
-        margin-bottom: 24px;
-    }
-    </style>
-    <div class="login-title">PNM ACTIVATION FUNNEL</div>
-    <div class="login-sub">Wiom Internal Dashboard — Restricted Access</div>
-    """, unsafe_allow_html=True)
-
-    col1, col2, col3 = st.columns([1, 3, 1])
-    with col2:
-        email    = st.text_input("Wiom Email", placeholder="name@wiom.in")
-        password = st.text_input("Password", type="password")
-
-        if st.button("Login", use_container_width=True):
-            try:
-                correct_pw = st.secrets["APP_PASSWORD"]
-            except Exception:
-                from dotenv import load_dotenv
-                load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
-                correct_pw = os.getenv("APP_PASSWORD", "")
-
-            clean_email = email.strip().lower()
-            valid_domain = clean_email.endswith("@wiom.in") or clean_email.endswith("@i2e1.com")
-            if not valid_domain:
-                st.error("Access restricted to @wiom.in and @i2e1.com emails only.")
-            elif password.strip() != correct_pw.strip():
-                st.error("Incorrect password. Please try again.")
-            else:
-                st.session_state.authenticated = True
-                st.session_state.user_email = clean_email
-                # Save token in URL so session survives server restarts
-                st.query_params["e"] = clean_email
-                st.query_params["t"] = _make_token(clean_email, correct_pw.strip())
-                st.rerun()
-    st.stop()
-
-# ── Top bar: title + download + logout ───────────────────────────────────────
-col_title, col_download, col_logout = st.columns([5, 1.8, 1])
-with col_title:
-    st.markdown(
-        "<div style='font-size:20px;font-weight:bold;color:#1F3864;padding-top:6px'>"
-        "PNM Activation Funnel</div>",
-        unsafe_allow_html=True
-    )
-with col_download:
-    secrets = get_secrets()
-    excel_bytes = build_excel_bytes(
-        secrets["sheet_id"], secrets["gcp_creds"],
-        secrets["railway_url"], secrets["railway_email"], secrets["railway_pass"]
-    )
-    st.download_button(
-        label="⬇ Download Excel",
-        data=excel_bytes,
-        file_name=f"PNM_Activation_{datetime.now().strftime('%d%b%Y')}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True
-    )
-with col_logout:
-    if st.button("Logout", use_container_width=True):
-        st.session_state.authenticated = False
-        st.session_state.user_email = ""
-        st.query_params.clear()
-        st.rerun()
-
-# Auto-refresh every 30 seconds
-st_autorefresh(interval=30000)
-
-st.markdown("""
-<style>
-.funnel-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-family: Arial, sans-serif;
-    font-size: 13px;
-}
-.funnel-table td {
-    padding: 8px 12px;
-    border: 1px solid #cccccc;
-    color: #000000;
-}
-.updated { font-size: 11px; color: #666; text-align: right; margin-bottom: 6px; }
-</style>
-""", unsafe_allow_html=True)
-
-# ── Google Sheet fetch (col A = partner ID, col N = calling status) ───────────
 @st.cache_data(ttl=30)
 def fetch_sheet(sheet_id, gcp_creds):
     creds = Credentials.from_service_account_info(
@@ -199,13 +71,12 @@ def fetch_sheet(sheet_id, gcp_creds):
     client = gspread.authorize(creds)
     sheet  = client.open_by_key(sheet_id).sheet1
 
-    col_a = sheet.col_values(1)[1:]   # Partner Account IDs
-    col_n = sheet.col_values(15)[1:]  # Calling status (Remarks Dropdown — column O)
+    col_a = sheet.col_values(1)[1:]   # Partner IDs
+    col_n = sheet.col_values(15)[1:]  # Calling status (column O)
     col_p = sheet.col_values(16)[1:]  # PSH Remark
 
     col_n = ["Appointment Scheduled" if v == "Appointment Confirmed" else v for v in col_n]
 
-    # Build partner_id → calling_status mapping
     partner_calling = {}
     for pid, status in zip(col_a, col_n):
         pid = str(pid).strip()
@@ -214,7 +85,6 @@ def fetch_sheet(sheet_id, gcp_creds):
 
     return Counter(col_n), Counter(col_p), partner_calling
 
-# ── Metabase userbase fetch (active customers per partner from Snowflake) ─────
 @st.cache_data(ttl=300)
 def fetch_userbase(metabase_url, api_key):
     try:
@@ -231,12 +101,10 @@ def fetch_userbase(metabase_url, api_key):
         )
         data = resp.json()
         rows = data.get("data", {}).get("rows", [])
-        # Returns {partner_account_id: active_customers}
         return {str(r[0]).strip(): int(r[1] or 0) for r in rows if r[0]}
     except Exception:
         return {}
 
-# ── Railway fetch ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=30)
 def fetch_railway(url, email, password):
     try:
@@ -253,7 +121,6 @@ def fetch_railway(url, email, password):
             partners = next((v for v in partners.values() if isinstance(v, list)), [])
 
         counts = {"activation_done": 0, "rescheduled": 0, "denied": 0, "not_available": 0}
-        # Map partner_account_id → activation_status
         partner_activation = {}
         for p in partners:
             cases = p.get("cases", [])
@@ -271,10 +138,9 @@ def fetch_railway(url, email, password):
     except Exception as e:
         return None, {}, str(e)
 
-# ── Build Excel: Partner ID, Partner Name, PNM Activation ────────────────────
 @st.cache_data(ttl=30)
 def build_excel_bytes(sheet_id, gcp_creds, railway_url, railway_email, railway_pass):
-    # Fetch Partner ID + Partner Name from Google Sheet
+    # Partner ID + Name from Google Sheet
     creds = Credentials.from_service_account_info(
         gcp_creds,
         scopes=[
@@ -287,7 +153,7 @@ def build_excel_bytes(sheet_id, gcp_creds, railway_url, railway_email, railway_p
     col_a  = sheet.col_values(1)[1:]   # Partner IDs
     col_b  = sheet.col_values(2)[1:]   # Partner Names
 
-    # Fetch activation status from Railway
+    # Activation status from Railway
     _, partner_activation, _ = fetch_railway(railway_url, railway_email, railway_pass)
 
     rows = []
@@ -306,7 +172,6 @@ def build_excel_bytes(sheet_id, gcp_creds, railway_url, railway_email, railway_p
         df.to_excel(writer, index=False, sheet_name="PNM Activation")
     return output.getvalue()
 
-# ── Sum userbase for a set of partner IDs ────────────────────────────────────
 def ub_raw(partner_ids, userbase_map):
     return sum(userbase_map.get(pid, 0) for pid in partner_ids)
 
@@ -317,7 +182,6 @@ def ub(partner_ids, userbase_map):
 def ub_fmt(total):
     return f"{total:,}" if total > 0 else "—"
 
-# ── Build funnel numbers ──────────────────────────────────────────────────────
 def build(calling, railway, partner_calling, partner_activation, userbase_map):
     ELIGIBLE = 1201
 
@@ -342,64 +206,59 @@ def build(calling, railway, partner_calling, partner_activation, userbase_map):
     not_available = railway.get("not_available", 0)
     yet_to_visit  = max(appt_sched - pnm_activated - rescheduled - denied_pnm - not_available, 0)
 
-    # Partner ID sets by calling status
-    all_pids      = set(partner_calling.keys())
-    called_pids   = {pid for pid, s in partner_calling.items() if s in (CONNECTED_S | NOT_CONN_S)}
+    all_pids        = set(partner_calling.keys())
+    called_pids     = {pid for pid, s in partner_calling.items() if s in (CONNECTED_S | NOT_CONN_S)}
     not_called_pids = all_pids - called_pids
-    conn_pids     = {pid for pid, s in partner_calling.items() if s in CONNECTED_S}
-    not_conn_pids = {pid for pid, s in partner_calling.items() if s in NOT_CONN_S}
-    appt_pids     = {pid for pid, s in partner_calling.items() if s == "Appointment Scheduled"}
-    not_sched_pids= conn_pids - appt_pids
-    cbl_pids      = {pid for pid, s in partner_calling.items() if s == "Call Back Later"}
-    denied_c_pids = {pid for pid, s in partner_calling.items() if s == "Denied"}
-    oot_pids      = {pid for pid, s in partner_calling.items() if s == "Out of Town"}
-    shifted_pids  = {pid for pid, s in partner_calling.items() if s == "Shifted to Other Partner"}
-    mail_pids     = {pid for pid, s in partner_calling.items() if s == "Px Asking Details on Mail"}
-    wrong_pids    = {pid for pid, s in partner_calling.items() if s == "Wrong Number"}
-    dnp_pids      = {pid for pid, s in partner_calling.items() if s == "DNP"}
-    nc_pids       = {pid for pid, s in partner_calling.items() if s == "Not Contactable"}
+    conn_pids       = {pid for pid, s in partner_calling.items() if s in CONNECTED_S}
+    not_conn_pids   = {pid for pid, s in partner_calling.items() if s in NOT_CONN_S}
+    appt_pids       = {pid for pid, s in partner_calling.items() if s == "Appointment Scheduled"}
+    not_sched_pids  = conn_pids - appt_pids
+    cbl_pids        = {pid for pid, s in partner_calling.items() if s == "Call Back Later"}
+    denied_c_pids   = {pid for pid, s in partner_calling.items() if s == "Denied"}
+    oot_pids        = {pid for pid, s in partner_calling.items() if s == "Out of Town"}
+    shifted_pids    = {pid for pid, s in partner_calling.items() if s == "Shifted to Other Partner"}
+    mail_pids       = {pid for pid, s in partner_calling.items() if s == "Px Asking Details on Mail"}
+    wrong_pids      = {pid for pid, s in partner_calling.items() if s == "Wrong Number"}
+    dnp_pids        = {pid for pid, s in partner_calling.items() if s == "DNP"}
+    nc_pids         = {pid for pid, s in partner_calling.items() if s == "Not Contactable"}
 
-    # Activation partner sets — Railway partner_id matches Snowflake PARTNER_ACCOUNT_ID
     act_pids      = {pid for pid, s in partner_activation.items() if s == "activation_done"}
     resch_pids    = {pid for pid, s in partner_activation.items() if s == "rescheduled"}
     denied_p_pids = {pid for pid, s in partner_activation.items() if s == "denied"}
     na_pids       = {pid for pid, s in partner_activation.items() if s == "not_available"}
 
-    # Yet to Visit userbase = Appt Scheduled UB - Activated UB - Rescheduled UB - Denied UB - Not Available UB
-    # Same arithmetic logic as the partner count
-    appt_ub  = ub_raw(appt_pids,      userbase_map)
-    act_ub   = ub_raw(act_pids,       userbase_map)
-    resch_ub = ub_raw(resch_pids,     userbase_map)
-    deny_ub  = ub_raw(denied_p_pids,  userbase_map)
-    na_ub    = ub_raw(na_pids,        userbase_map)
-    ytv_ub   = max(appt_ub - act_ub - resch_ub - deny_ub - na_ub, 0)
+    appt_ub    = ub_raw(appt_pids,     userbase_map)
+    act_ub     = ub_raw(act_pids,      userbase_map)
+    resch_ub   = ub_raw(resch_pids,    userbase_map)
+    deny_ub    = ub_raw(denied_p_pids, userbase_map)
+    na_ub      = ub_raw(na_pids,       userbase_map)
+    ytv_ub     = max(appt_ub - act_ub - resch_ub - deny_ub - na_ub, 0)
     not_act_ub = max(appt_ub - act_ub, 0)
 
     return {
-        "eligible":        (ELIGIBLE,      ub(all_pids,       userbase_map)),
-        "calls_made":      (calls_made,    ub(called_pids,    userbase_map)),
-        "not_called":      (not_called,    ub(not_called_pids,userbase_map)),
-        "connected":       (connected,     ub(conn_pids,      userbase_map)),
-        "not_connected":   (not_connected, ub(not_conn_pids,  userbase_map)),
-        "dnp":             (calling["DNP"],ub(dnp_pids,       userbase_map)),
-        "not_contactable": (calling["Not Contactable"], ub(nc_pids, userbase_map)),
-        "appt_sched":      (appt_sched,    ub(appt_pids,      userbase_map)),
-        "not_sched":       (not_sched,     ub(not_sched_pids, userbase_map)),
-        "ns_cbl":          (calling["Call Back Later"],          ub(cbl_pids,     userbase_map)),
-        "ns_denied":       (calling["Denied"],                   ub(denied_c_pids,userbase_map)),
-        "ns_oot":          (calling["Out of Town"],              ub(oot_pids,     userbase_map)),
+        "eligible":        (ELIGIBLE,      ub(all_pids,        userbase_map)),
+        "calls_made":      (calls_made,    ub(called_pids,     userbase_map)),
+        "not_called":      (not_called,    ub(not_called_pids, userbase_map)),
+        "connected":       (connected,     ub(conn_pids,       userbase_map)),
+        "not_connected":   (not_connected, ub(not_conn_pids,   userbase_map)),
+        "dnp":             (calling["DNP"],ub(dnp_pids,        userbase_map)),
+        "not_contactable": (calling["Not Contactable"],        ub(nc_pids,       userbase_map)),
+        "appt_sched":      (appt_sched,    ub(appt_pids,       userbase_map)),
+        "not_sched":       (not_sched,     ub(not_sched_pids,  userbase_map)),
+        "ns_cbl":          (calling["Call Back Later"],         ub(cbl_pids,      userbase_map)),
+        "ns_denied":       (calling["Denied"],                  ub(denied_c_pids, userbase_map)),
+        "ns_oot":          (calling["Out of Town"],             ub(oot_pids,      userbase_map)),
         "ns_shifted":      (calling.get("Shifted to Other Partner", 0), ub(shifted_pids, userbase_map)),
-        "ns_mail":         (calling["Px Asking Details on Mail"],ub(mail_pids,    userbase_map)),
+        "ns_mail":         (calling["Px Asking Details on Mail"], ub(mail_pids,   userbase_map)),
         "ns_wrong":        (calling["Wrong Number"],             ub(wrong_pids,   userbase_map)),
         "pnm_activated":   (pnm_activated,                      ub_fmt(act_ub)),
         "not_activated":   (max(appt_sched - pnm_activated, 0), ub_fmt(not_act_ub)),
         "yet_to_visit":    (yet_to_visit,                       ub_fmt(ytv_ub)),
         "rescheduled":     (rescheduled,                        ub_fmt(resch_ub)),
-        "denied_pnm":      (denied_pnm,                        ub_fmt(deny_ub)),
+        "denied_pnm":      (denied_pnm,                         ub_fmt(deny_ub)),
         "not_available":   (not_available,                      ub_fmt(na_ub)),
     }
 
-# ── HTML rows (3 columns: METRIC | COUNT | USERBASE) ─────────────────────────
 def title_r(label, count, userbase, bg, white_text=False):
     fc = "#ffffff" if white_text else "#000000"
     return (
@@ -431,7 +290,6 @@ def sub_r(label, count, userbase, bg="#ffffff"):
 def gap_r():
     return '<tr><td colspan="3" style="padding:2px;border:none;background:#f0f2f6"></td></tr>'
 
-# ── Render ────────────────────────────────────────────────────────────────────
 def render():
     secrets = get_secrets()
 
@@ -469,37 +327,149 @@ def render():
 
     c, u = lambda k: f[k][0], lambda k: f[k][1]
 
-    # Call section
-    html += plain_r("Eligible CSP",       c("eligible"),      u("eligible"),      "#D6E4F0")
-    html += title_r("Total Calls Made",   c("calls_made"),    u("calls_made"),    "#2E75B6", white_text=True)
-    html += plain_r("Not Yet Called",     c("not_called"),    u("not_called"),    "#D6E4F0")
+    html += plain_r("Eligible CSP",        c("eligible"),       u("eligible"),       "#D6E4F0")
+    html += title_r("Total Calls Made",    c("calls_made"),     u("calls_made"),     "#2E75B6", white_text=True)
+    html += plain_r("Not Yet Called",      c("not_called"),     u("not_called"),     "#D6E4F0")
     html += gap_r()
-    html += plain_r("Connected",          c("connected"),     u("connected"),     "#D6E4F0")
-    html += plain_r("Not Connected / DNP",c("not_connected"), u("not_connected"), "#D6E4F0")
-    html += sub_r  ("DNP (Did Not Pick)", c("dnp"),           u("dnp"),           "#EBF3FB")
-    html += sub_r  ("Not Contactable",    c("not_contactable"),u("not_contactable"),"#EBF3FB")
+    html += plain_r("Connected",           c("connected"),      u("connected"),      "#D6E4F0")
+    html += plain_r("Not Connected / DNP", c("not_connected"),  u("not_connected"),  "#D6E4F0")
+    html += sub_r  ("DNP (Did Not Pick)",  c("dnp"),            u("dnp"),            "#EBF3FB")
+    html += sub_r  ("Not Contactable",     c("not_contactable"),u("not_contactable"),"#EBF3FB")
     html += gap_r()
 
-    # Appointment section
     html += title_r("Appointment Scheduled  (from Connected)",     c("appt_sched"), u("appt_sched"), "#ED7D31", white_text=True)
     html += plain_r("Appointment Not Scheduled  (from Connected)", c("not_sched"),  u("not_sched"),  "#FCE4D6")
-    html += sub_r  ("Call Back Later",          c("ns_cbl"),     u("ns_cbl"),     "#FEF4EE")
-    html += sub_r  ("Denied",                   c("ns_denied"),  u("ns_denied"),  "#FEF4EE")
-    html += sub_r  ("Out of Town",              c("ns_oot"),     u("ns_oot"),     "#FEF4EE")
-    html += sub_r  ("Shifted to Other Partner", c("ns_shifted"), u("ns_shifted"), "#FEF4EE")
-    html += sub_r  ("Asking Details on Mail",   c("ns_mail"),    u("ns_mail"),    "#FEF4EE")
-    html += sub_r  ("Wrong Number",             c("ns_wrong"),   u("ns_wrong"),   "#FEF4EE")
+    html += sub_r  ("Call Back Later",           c("ns_cbl"),     u("ns_cbl"),     "#FEF4EE")
+    html += sub_r  ("Denied",                    c("ns_denied"),  u("ns_denied"),  "#FEF4EE")
+    html += sub_r  ("Out of Town",               c("ns_oot"),     u("ns_oot"),     "#FEF4EE")
+    html += sub_r  ("Shifted to Other Partner",  c("ns_shifted"), u("ns_shifted"), "#FEF4EE")
+    html += sub_r  ("Asking Details on Mail",    c("ns_mail"),    u("ns_mail"),    "#FEF4EE")
+    html += sub_r  ("Wrong Number",              c("ns_wrong"),   u("ns_wrong"),   "#FEF4EE")
     html += gap_r()
 
-    # Activation section
     html += title_r("PNM Activated  (from Appointment Scheduled)", c("pnm_activated"), u("pnm_activated"), "#375623", white_text=True)
     html += plain_r("Not Activated  (from Appointment Scheduled)", c("not_activated"), u("not_activated"), "#FFC7CE")
-    html += sub_r  ("Visit Yet to Happen", c("yet_to_visit"),  u("yet_to_visit"),  "#FFE2E2")
-    html += sub_r  ("Rescheduled",         c("rescheduled"),   u("rescheduled"),   "#FFE2E2")
-    html += sub_r  ("Denied",              c("denied_pnm"),    u("denied_pnm"),    "#FFE2E2")
-    html += sub_r  ("Not Available",       c("not_available"), u("not_available"), "#FFE2E2")
+    html += sub_r  ("Visit Yet to Happen", c("yet_to_visit"), u("yet_to_visit"), "#FFE2E2")
+    html += sub_r  ("Rescheduled",         c("rescheduled"),  u("rescheduled"),  "#FFE2E2")
+    html += sub_r  ("Denied",              c("denied_pnm"),   u("denied_pnm"),   "#FFE2E2")
+    html += sub_r  ("Not Available",       c("not_available"),u("not_available"),"#FFE2E2")
 
     html += "</table>"
     st.markdown(html, unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MODULE-LEVEL EXECUTION (runs top to bottom — all functions defined above)
+# ─────────────────────────────────────────────────────────────────────────────
+
+st.set_page_config(page_title="PNM Activation Funnel", layout="centered")
+
+st.markdown("""
+<style>
+[data-testid="stToolbar"] {visibility: hidden !important;}
+[data-testid="stDecoration"] {display: none !important;}
+footer {visibility: hidden !important;}
+#MainMenu {visibility: hidden !important;}
+</style>
+""", unsafe_allow_html=True)
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+# Auto-restore session from URL token (survives server restarts)
+if not st.session_state.authenticated:
+    _params = st.query_params
+    _e = _params.get("e", "")
+    _t = _params.get("t", "")
+    if _e and _t:
+        _correct_pw = _load_app_password()
+        _valid_domain = _e.endswith("@wiom.in") or _e.endswith("@i2e1.com")
+        if _valid_domain and _t == _make_token(_e, _correct_pw):
+            st.session_state.authenticated = True
+            st.session_state.user_email = _e
+
+if not st.session_state.authenticated:
+    st.markdown("""
+    <style>
+    .login-title {
+        background: #1F3864; color: white; padding: 16px;
+        border-radius: 8px; text-align: center;
+        font-size: 18px; font-weight: bold; margin-bottom: 8px;
+    }
+    .login-sub { text-align: center; color: #555; font-size: 13px; margin-bottom: 24px; }
+    </style>
+    <div class="login-title">PNM ACTIVATION FUNNEL</div>
+    <div class="login-sub">Wiom Internal Dashboard — Restricted Access</div>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 3, 1])
+    with col2:
+        email    = st.text_input("Wiom Email", placeholder="name@wiom.in")
+        password = st.text_input("Password", type="password")
+
+        if st.button("Login", use_container_width=True):
+            try:
+                correct_pw = st.secrets["APP_PASSWORD"]
+            except Exception:
+                from dotenv import load_dotenv
+                load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+                correct_pw = os.getenv("APP_PASSWORD", "")
+
+            clean_email  = email.strip().lower()
+            valid_domain = clean_email.endswith("@wiom.in") or clean_email.endswith("@i2e1.com")
+            if not valid_domain:
+                st.error("Access restricted to @wiom.in and @i2e1.com emails only.")
+            elif password.strip() != correct_pw.strip():
+                st.error("Incorrect password. Please try again.")
+            else:
+                st.session_state.authenticated = True
+                st.session_state.user_email    = clean_email
+                st.query_params["e"] = clean_email
+                st.query_params["t"] = _make_token(clean_email, correct_pw.strip())
+                st.rerun()
+    st.stop()
+
+# ── Top bar ───────────────────────────────────────────────────────────────────
+st.markdown("""
+<style>
+.funnel-table {
+    width: 100%; border-collapse: collapse;
+    font-family: Arial, sans-serif; font-size: 13px;
+}
+.funnel-table td { padding: 8px 12px; border: 1px solid #cccccc; color: #000000; }
+.updated { font-size: 11px; color: #666; text-align: right; margin-bottom: 6px; }
+</style>
+""", unsafe_allow_html=True)
+
+col_title, col_download, col_logout = st.columns([5, 1.8, 1])
+with col_title:
+    st.markdown(
+        "<div style='font-size:20px;font-weight:bold;color:#1F3864;padding-top:6px'>"
+        "PNM Activation Funnel</div>",
+        unsafe_allow_html=True
+    )
+with col_download:
+    _s = get_secrets()
+    _excel = build_excel_bytes(
+        _s["sheet_id"], _s["gcp_creds"],
+        _s["railway_url"], _s["railway_email"], _s["railway_pass"]
+    )
+    st.download_button(
+        label="⬇ Download Excel",
+        data=_excel,
+        file_name=f"PNM_Activation_{datetime.now().strftime('%d%b%Y')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
+with col_logout:
+    if st.button("Logout", use_container_width=True):
+        st.session_state.authenticated = False
+        st.session_state.user_email = ""
+        st.query_params.clear()
+        st.rerun()
+
+# Auto-refresh every 30 seconds
+st_autorefresh(interval=30000)
 
 render()
