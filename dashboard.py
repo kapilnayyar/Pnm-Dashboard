@@ -7,6 +7,23 @@ from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 import json
 import os
+import hashlib
+
+_TOKEN_SALT = "pnm-wiom-dashboard-2024"
+
+def _load_app_password():
+    """Load APP_PASSWORD from Streamlit secrets or local .env."""
+    try:
+        return st.secrets["APP_PASSWORD"]
+    except Exception:
+        from dotenv import load_dotenv
+        load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+        return os.getenv("APP_PASSWORD", "")
+
+def _make_token(email, correct_pw):
+    """Create a URL-safe session token from email + password hash."""
+    raw = f"{email}|{correct_pw}|{_TOKEN_SALT}"
+    return hashlib.sha256(raw.encode()).hexdigest()
 
 st.set_page_config(page_title="PNM Activation Funnel", layout="centered")
 
@@ -23,6 +40,18 @@ footer {visibility: hidden !important;}
 # ── Login page ────────────────────────────────────────────────────────────────
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
+
+# Auto-restore session from URL token (survives Streamlit server restarts)
+if not st.session_state.authenticated:
+    _params = st.query_params
+    _e = _params.get("e", "")
+    _t = _params.get("t", "")
+    if _e and _t:
+        _correct_pw = _load_app_password()
+        _valid_domain = _e.endswith("@wiom.in") or _e.endswith("@i2e1.com")
+        if _valid_domain and _t == _make_token(_e, _correct_pw):
+            st.session_state.authenticated = True
+            st.session_state.user_email = _e
 
 if not st.session_state.authenticated:
     st.markdown("""
@@ -70,6 +99,9 @@ if not st.session_state.authenticated:
             else:
                 st.session_state.authenticated = True
                 st.session_state.user_email = clean_email
+                # Save token in URL so session survives server restarts
+                st.query_params["e"] = clean_email
+                st.query_params["t"] = _make_token(clean_email, correct_pw.strip())
                 st.rerun()
     st.stop()
 
@@ -85,6 +117,7 @@ with col_logout:
     if st.button("Logout", use_container_width=True):
         st.session_state.authenticated = False
         st.session_state.user_email = ""
+        st.query_params.clear()
         st.rerun()
 
 # Auto-refresh every 30 seconds
