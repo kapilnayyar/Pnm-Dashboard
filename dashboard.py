@@ -75,6 +75,10 @@ def fetch_sheet(sheet_id, gcp_creds):
     col_n = sheet.col_values(15)[1:]  # Calling status (column O)
     col_p = sheet.col_values(16)[1:]  # PSH Remark
 
+    # Pad col_n to col_a length so partners at the bottom with blank status are not dropped
+    if len(col_n) < len(col_a):
+        col_n += [""] * (len(col_a) - len(col_n))
+
     col_n = ["Appointment Scheduled" if v == "Appointment Confirmed" else v for v in col_n]
 
     partner_calling = {}
