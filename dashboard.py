@@ -27,6 +27,37 @@ def _make_token(email, correct_pw):
     raw = f"{email}|{correct_pw}|{_TOKEN_SALT}"
     return hashlib.sha256(raw.encode()).hexdigest()
 
+# ── Credentials ───────────────────────────────────────────────────────────────
+def get_secrets():
+    try:
+        return {
+            "railway_url":    st.secrets["RAILWAY_APP_URL"],
+            "railway_email":  st.secrets["RAILWAY_EMAIL"],
+            "railway_pass":   st.secrets["RAILWAY_PASSWORD"],
+            "sheet_id":       st.secrets["GOOGLE_SHEET_ID"],
+            "gcp_creds":      dict(st.secrets["gcp_service_account"]),
+            "metabase_url":   st.secrets["METABASE_URL"],
+            "metabase_key":   st.secrets["METABASE_API_KEY"],
+        }
+    except Exception:
+        from dotenv import load_dotenv
+        BASE = os.path.dirname(os.path.abspath(__file__))
+        load_dotenv(os.path.join(BASE, ".env"))
+        home_env = os.path.join(os.path.expanduser("~"), ".env")
+        if os.path.exists(home_env):
+            load_dotenv(home_env)
+        with open(os.path.join(BASE, "google_credentials.json")) as f:
+            gcp = json.load(f)
+        return {
+            "railway_url":   os.getenv("RAILWAY_APP_URL"),
+            "railway_email": os.getenv("RAILWAY_EMAIL"),
+            "railway_pass":  os.getenv("RAILWAY_PASSWORD"),
+            "sheet_id":      os.getenv("GOOGLE_SHEET_ID"),
+            "gcp_creds":     gcp,
+            "metabase_url":  "https://metabase.wiom.in",
+            "metabase_key":  os.getenv("METABASE_API_KEY", ""),
+        }
+
 st.set_page_config(page_title="PNM Activation Funnel", layout="centered")
 
 # Hide GitHub icon, toolbar, and footer
@@ -154,38 +185,6 @@ st.markdown("""
 .updated { font-size: 11px; color: #666; text-align: right; margin-bottom: 6px; }
 </style>
 """, unsafe_allow_html=True)
-
-# ── Credentials ───────────────────────────────────────────────────────────────
-def get_secrets():
-    try:
-        return {
-            "railway_url":    st.secrets["RAILWAY_APP_URL"],
-            "railway_email":  st.secrets["RAILWAY_EMAIL"],
-            "railway_pass":   st.secrets["RAILWAY_PASSWORD"],
-            "sheet_id":       st.secrets["GOOGLE_SHEET_ID"],
-            "gcp_creds":      dict(st.secrets["gcp_service_account"]),
-            "metabase_url":   st.secrets["METABASE_URL"],
-            "metabase_key":   st.secrets["METABASE_API_KEY"],
-        }
-    except Exception:
-        from dotenv import load_dotenv
-        BASE = os.path.dirname(os.path.abspath(__file__))
-        load_dotenv(os.path.join(BASE, ".env"))
-        # Also load global .env for Metabase key
-        home_env = os.path.join(os.path.expanduser("~"), ".env")
-        if os.path.exists(home_env):
-            load_dotenv(home_env)
-        with open(os.path.join(BASE, "google_credentials.json")) as f:
-            gcp = json.load(f)
-        return {
-            "railway_url":   os.getenv("RAILWAY_APP_URL"),
-            "railway_email": os.getenv("RAILWAY_EMAIL"),
-            "railway_pass":  os.getenv("RAILWAY_PASSWORD"),
-            "sheet_id":      os.getenv("GOOGLE_SHEET_ID"),
-            "gcp_creds":     gcp,
-            "metabase_url":  "https://metabase.wiom.in",
-            "metabase_key":  os.getenv("METABASE_API_KEY", ""),
-        }
 
 # ── Google Sheet fetch (col A = partner ID, col N = calling status) ───────────
 @st.cache_data(ttl=30)
