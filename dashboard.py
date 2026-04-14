@@ -188,7 +188,7 @@ def build(calling, railway, partner_calling, partner_activation, userbase_map):
     CONNECTED_S = {
         "Appointment Scheduled", "Call Back Later", "Denied",
         "Out of Town", "Px Asking Details on Mail", "Wrong Number",
-        "Shifted to Other Partner"
+        "Shifted to Other Partner", "ISP Shut down"
     }
     NOT_CONN_S = {"DNP", "Not Contactable"}
 
@@ -219,6 +219,7 @@ def build(calling, railway, partner_calling, partner_activation, userbase_map):
     shifted_pids    = {pid for pid, s in partner_calling.items() if s == "Shifted to Other Partner"}
     mail_pids       = {pid for pid, s in partner_calling.items() if s == "Px Asking Details on Mail"}
     wrong_pids      = {pid for pid, s in partner_calling.items() if s == "Wrong Number"}
+    isp_pids        = {pid for pid, s in partner_calling.items() if s == "ISP Shut down"}
     dnp_pids        = {pid for pid, s in partner_calling.items() if s == "DNP"}
     nc_pids         = {pid for pid, s in partner_calling.items() if s == "Not Contactable"}
 
@@ -251,6 +252,7 @@ def build(calling, railway, partner_calling, partner_activation, userbase_map):
         "ns_shifted":      (calling.get("Shifted to Other Partner", 0), ub(shifted_pids, userbase_map)),
         "ns_mail":         (calling["Px Asking Details on Mail"], ub(mail_pids,   userbase_map)),
         "ns_wrong":        (calling["Wrong Number"],             ub(wrong_pids,   userbase_map)),
+        "ns_isp":          (calling.get("ISP Shut down", 0),      ub(isp_pids,     userbase_map)),
         "pnm_activated":   (pnm_activated,                      ub_fmt(act_ub)),
         "not_activated":   (max(appt_sched - pnm_activated, 0), ub_fmt(not_act_ub)),
         "yet_to_visit":    (yet_to_visit,                       ub_fmt(ytv_ub)),
@@ -345,6 +347,7 @@ def render():
     html += sub_r  ("Shifted to Other Partner",  c("ns_shifted"), u("ns_shifted"), "#FEF4EE")
     html += sub_r  ("Asking Details on Mail",    c("ns_mail"),    u("ns_mail"),    "#FEF4EE")
     html += sub_r  ("Wrong Number",              c("ns_wrong"),   u("ns_wrong"),   "#FEF4EE")
+    html += sub_r  ("ISP Shut down",             c("ns_isp"),     u("ns_isp"),     "#FEF4EE")
     html += gap_r()
 
     html += title_r("PNM Activated  (from Appointment Scheduled)", c("pnm_activated"), u("pnm_activated"), "#375623", white_text=True)
