@@ -160,12 +160,14 @@ def build_excel_bytes(sheet_id, gcp_creds, railway_url, railway_email, railway_p
     # Activation status from Railway
     _, partner_activation, _ = fetch_railway(railway_url, railway_email, railway_pass)
 
+    seen = set()
     rows = []
     for pid, name in zip(col_a, col_b):
         pid  = str(pid).strip()
         name = str(name).strip()
-        if not pid:
+        if not pid or pid in seen:
             continue
+        seen.add(pid)
         status     = partner_activation.get(pid, "")
         activation = "Yes" if status == "activation_done" else "No"
         rows.append({"Partner ID": pid, "Partner Name": name, "PNM Activation": activation})
