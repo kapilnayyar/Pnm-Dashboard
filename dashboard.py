@@ -92,10 +92,10 @@ def fetch_sheet(sheet_id, gcp_creds):
 @st.cache_data(ttl=300)
 def fetch_userbase(metabase_url, api_key):
     try:
-        yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
         query = (
-            f"select partner_account_id, sum(ACTIVE_R15_CUSTOMERS) as active_customers "
-            f"from customer_base where DATE = '{yesterday}' group by all"
+            "select cast(partner_account_id as varchar) as partner_account_id, "
+            "sum(active_customer_d_1) as active_customers "
+            "from supply_model group by 1"
         )
         resp = requests.post(
             f"{metabase_url}/api/dataset",
