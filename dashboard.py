@@ -242,18 +242,17 @@ def build(calling, railway, partner_calling, partner_activation, railway_all_pid
     denied_pnm    = len(denied_p_pids)
     not_available = len(na_pids)
 
-    # Not Activated and Visit Yet to Happen are scoped to sheet's Appointment Scheduled.
-    not_act_pids = appt_pids - act_pids
-    ytv_pids     = appt_pids - act_pids - resch_pids - denied_p_pids - na_pids
-    not_activated_count = len(not_act_pids)
-    yet_to_visit        = len(ytv_pids)
+    # Not Activated and Visit Yet to Happen — simple arithmetic, clamped to 0.
+    not_activated_count = max(appt_sched - pnm_activated, 0)
+    yet_to_visit        = max(appt_sched - pnm_activated - rescheduled - denied_pnm - not_available, 0)
 
+    appt_ub    = ub_raw(appt_pids,     userbase_map)
     act_ub     = ub_raw(act_pids,      userbase_map)
     resch_ub   = ub_raw(resch_pids,    userbase_map)
     deny_ub    = ub_raw(denied_p_pids, userbase_map)
     na_ub      = ub_raw(na_pids,       userbase_map)
-    not_act_ub = ub_raw(not_act_pids,  userbase_map)
-    ytv_ub     = ub_raw(ytv_pids,      userbase_map)
+    not_act_ub = max(appt_ub - act_ub, 0)
+    ytv_ub     = max(appt_ub - act_ub - resch_ub - deny_ub - na_ub, 0)
 
     return {
         "eligible":        (ELIGIBLE,      ub(all_pids,        userbase_map)),
