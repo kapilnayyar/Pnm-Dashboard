@@ -209,10 +209,9 @@ def build(calling, railway, partner_calling, partner_activation, railway_all_pid
     appt_sched    = calling["Appointment Scheduled"]
     not_sched     = connected - appt_sched
 
-    pnm_activated = railway.get("activation_done", 0)
-    rescheduled   = railway.get("rescheduled", 0)
-    denied_pnm    = railway.get("denied", 0)
-    not_available = railway.get("not_available", 0)
+    # Activation row counts will be derived below by intersecting Railway sets
+    # with the sheet's Appointment Scheduled pool, since the activation rows are
+    # labelled "(from Appointment Scheduled)".
 
     all_pids        = set(partner_calling.keys())
     called_pids     = {pid for pid, s in partner_calling.items() if s in (CONNECTED_S | NOT_CONN_S)}
@@ -231,18 +230,22 @@ def build(calling, railway, partner_calling, partner_activation, railway_all_pid
     dnp_pids        = {pid for pid, s in partner_calling.items() if s == "DNP"}
     nc_pids         = {pid for pid, s in partner_calling.items() if s == "Not Contactable"}
 
-    act_pids      = {pid for pid, s in partner_activation.items() if s == "activation_done"}
-    resch_pids    = {pid for pid, s in partner_activation.items() if s == "rescheduled"}
-    denied_p_pids = {pid for pid, s in partner_activation.items() if s == "denied"}
-    na_pids       = {pid for pid, s in partner_activation.items() if s == "not_available"}
+    # Restrict Railway statuses to partners in sheet's Appointment Scheduled pool,
+    # since the activation rows are labelled "(from Appointment Scheduled)".
+    act_pids      = {pid for pid, s in partner_activation.items() if s == "activation_done"} & appt_pids
+    resch_pids    = {pid for pid, s in partner_activation.items() if s == "rescheduled"}     & appt_pids
+    denied_p_pids = {pid for pid, s in partner_activation.items() if s == "denied"}          & appt_pids
+    na_pids       = {pid for pid, s in partner_activation.items() if s == "not_available"}   & appt_pids
 
-    # PNM activation rows — Railway only (no sheet data).
-    # Visit Yet to Happen = all Railway partners minus those already in a tracked status.
-    # Not Activated = all Railway partners minus activation_done.
-    ytv_pids     = railway_all_pids - act_pids - resch_pids - denied_p_pids - na_pids
-    not_act_pids = railway_all_pids - act_pids
-    yet_to_visit = len(ytv_pids)
+    not_act_pids = appt_pids - act_pids
+    ytv_pids     = appt_pids - act_pids - resch_pids - denied_p_pids - na_pids
+
+    pnm_activated       = len(act_pids)
+    rescheduled         = len(resch_pids)
+    denied_pnm          = len(denied_p_pids)
+    not_available       = len(na_pids)
     not_activated_count = len(not_act_pids)
+    yet_to_visit        = len(ytv_pids)
 
     act_ub     = ub_raw(act_pids,      userbase_map)
     resch_ub   = ub_raw(resch_pids,    userbase_map)
