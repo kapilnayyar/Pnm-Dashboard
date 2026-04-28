@@ -161,7 +161,7 @@ def build_excel_bytes(sheet_id, gcp_creds, railway_url, railway_email, railway_p
     col_b  = sheet.col_values(2)[1:]   # Partner Names
 
     # Activation status from Railway
-    _, partner_activation, _ = fetch_railway(railway_url, railway_email, railway_pass)
+    _, partner_activation, _, _ = fetch_railway(railway_url, railway_email, railway_pass)
 
     seen = set()
     rows = []
