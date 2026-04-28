@@ -119,14 +119,19 @@ def fetch_railway(url, email, password):
             timeout=15
         )
         if r.status_code != 200:
-            return None, {}, f"Login failed ({r.status_code})"
+            return None, {}, set(), f"Login failed ({r.status_code})"
         partners = session.get(f"{url}/api/partners", timeout=30).json()
         if isinstance(partners, dict):
             partners = next((v for v in partners.values() if isinstance(v, list)), [])
 
         counts = {"activation_done": 0, "rescheduled": 0, "denied": 0, "not_available": 0}
         partner_activation = {}
+        all_pids = set()
         for p in partners:
+            pid = str(p.get("partner_id") or "").strip()
+            if not pid:
+                continue
+            all_pids.add(pid)
             cases = p.get("cases", [])
             if not cases:
                 continue
@@ -134,13 +139,11 @@ def fetch_railway(url, email, password):
             status = latest.get("status", "")
             if status in counts:
                 counts[status] += 1
-            pid = str(p.get("partner_id") or "").strip()
-            if pid and status in counts:
                 partner_activation[pid] = status
 
-        return counts, partner_activation, None
+        return counts, partner_activation, all_pids, None
     except Exception as e:
-        return None, {}, str(e)
+        return None, {}, set(), str(e)
 
 @st.cache_data(ttl=30)
 def build_excel_bytes(sheet_id, gcp_creds, railway_url, railway_email, railway_pass):
@@ -188,7 +191,7 @@ def ub(partner_ids, userbase_map):
 def ub_fmt(total):
     return f"{total:,}" if total > 0 else "—"
 
-def build(calling, railway, partner_calling, partner_activation, userbase_map):
+def build(calling, railway, partner_calling, partner_activation, railway_all_pids, userbase_map):
     ELIGIBLE = 1201
 
     CONNECTED_S = {
@@ -233,10 +236,11 @@ def build(calling, railway, partner_calling, partner_activation, userbase_map):
     denied_p_pids = {pid for pid, s in partner_activation.items() if s == "denied"}
     na_pids       = {pid for pid, s in partner_activation.items() if s == "not_available"}
 
-    # Direct set logic — gives correct counts and userbases even when
-    # Railway and sheet partner sets don't perfectly overlap.
-    not_act_pids = appt_pids - act_pids
-    ytv_pids     = appt_pids - act_pids - resch_pids - denied_p_pids - na_pids
+    # PNM activation rows — Railway only (no sheet data).
+    # Visit Yet to Happen = all Railway partners minus those already in a tracked status.
+    # Not Activated = all Railway partners minus activation_done.
+    ytv_pids     = railway_all_pids - act_pids - resch_pids - denied_p_pids - na_pids
+    not_act_pids = railway_all_pids - act_pids
     yet_to_visit = len(ytv_pids)
     not_activated_count = len(not_act_pids)
 
@@ -308,7 +312,7 @@ def render():
 
     with st.spinner("Fetching live data..."):
         calling, _, partner_calling = fetch_sheet(secrets["sheet_id"], secrets["gcp_creds"])
-        railway, partner_activation, err = fetch_railway(
+        railway, partner_activation, railway_all_pids, err = fetch_railway(
             secrets["railway_url"], secrets["railway_email"], secrets["railway_pass"]
         )
         userbase_map = fetch_userbase(secrets["metabase_url"], secrets["metabase_key"])
@@ -317,7 +321,7 @@ def render():
         st.warning(f"⚠️ Railway: {err}")
         railway = {}
 
-    f = build(calling, railway or {}, partner_calling, partner_activation, userbase_map)
+    f = build(calling, railway or {}, partner_calling, partner_activation, railway_all_pids or set(), userbase_map)
 
     updated = datetime.now().strftime("%d-%b-%Y %H:%M")
 
