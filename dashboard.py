@@ -210,7 +210,6 @@ def build(calling, railway, partner_calling, partner_activation, userbase_map):
     rescheduled   = railway.get("rescheduled", 0)
     denied_pnm    = railway.get("denied", 0)
     not_available = railway.get("not_available", 0)
-    yet_to_visit  = max(appt_sched - pnm_activated - rescheduled - denied_pnm - not_available, 0)
 
     all_pids        = set(partner_calling.keys())
     called_pids     = {pid for pid, s in partner_calling.items() if s in (CONNECTED_S | NOT_CONN_S)}
@@ -234,13 +233,19 @@ def build(calling, railway, partner_calling, partner_activation, userbase_map):
     denied_p_pids = {pid for pid, s in partner_activation.items() if s == "denied"}
     na_pids       = {pid for pid, s in partner_activation.items() if s == "not_available"}
 
-    appt_ub    = ub_raw(appt_pids,     userbase_map)
+    # Direct set logic — gives correct counts and userbases even when
+    # Railway and sheet partner sets don't perfectly overlap.
+    not_act_pids = appt_pids - act_pids
+    ytv_pids     = appt_pids - act_pids - resch_pids - denied_p_pids - na_pids
+    yet_to_visit = len(ytv_pids)
+    not_activated_count = len(not_act_pids)
+
     act_ub     = ub_raw(act_pids,      userbase_map)
     resch_ub   = ub_raw(resch_pids,    userbase_map)
     deny_ub    = ub_raw(denied_p_pids, userbase_map)
     na_ub      = ub_raw(na_pids,       userbase_map)
-    ytv_ub     = max(appt_ub - act_ub - resch_ub - deny_ub - na_ub, 0)
-    not_act_ub = max(appt_ub - act_ub, 0)
+    not_act_ub = ub_raw(not_act_pids,  userbase_map)
+    ytv_ub     = ub_raw(ytv_pids,      userbase_map)
 
     return {
         "eligible":        (ELIGIBLE,      ub(all_pids,        userbase_map)),
@@ -260,7 +265,7 @@ def build(calling, railway, partner_calling, partner_activation, userbase_map):
         "ns_wrong":        (calling["Wrong Number"],             ub(wrong_pids,   userbase_map)),
         "ns_isp":          (calling.get("Window Shut down", 0),      ub(isp_pids,     userbase_map)),
         "pnm_activated":   (pnm_activated,                      ub_fmt(act_ub)),
-        "not_activated":   (max(appt_sched - pnm_activated, 0), ub_fmt(not_act_ub)),
+        "not_activated":   (not_activated_count,                ub_fmt(not_act_ub)),
         "yet_to_visit":    (yet_to_visit,                       ub_fmt(ytv_ub)),
         "rescheduled":     (rescheduled,                        ub_fmt(resch_ub)),
         "denied_pnm":      (denied_pnm,                         ub_fmt(deny_ub)),
