@@ -230,20 +230,21 @@ def build(calling, railway, partner_calling, partner_activation, railway_all_pid
     dnp_pids        = {pid for pid, s in partner_calling.items() if s == "DNP"}
     nc_pids         = {pid for pid, s in partner_calling.items() if s == "Not Contactable"}
 
-    # Restrict Railway statuses to partners in sheet's Appointment Scheduled pool,
-    # since the activation rows are labelled "(from Appointment Scheduled)".
-    act_pids      = {pid for pid, s in partner_activation.items() if s == "activation_done"} & appt_pids
-    resch_pids    = {pid for pid, s in partner_activation.items() if s == "rescheduled"}     & appt_pids
-    denied_p_pids = {pid for pid, s in partner_activation.items() if s == "denied"}          & appt_pids
-    na_pids       = {pid for pid, s in partner_activation.items() if s == "not_available"}   & appt_pids
+    # PNM Activated, Rescheduled, Denied, Not Available — Railway raw values
+    # (so they match the PNM/Railway dashboard exactly).
+    act_pids      = {pid for pid, s in partner_activation.items() if s == "activation_done"}
+    resch_pids    = {pid for pid, s in partner_activation.items() if s == "rescheduled"}
+    denied_p_pids = {pid for pid, s in partner_activation.items() if s == "denied"}
+    na_pids       = {pid for pid, s in partner_activation.items() if s == "not_available"}
 
+    pnm_activated = len(act_pids)
+    rescheduled   = len(resch_pids)
+    denied_pnm    = len(denied_p_pids)
+    not_available = len(na_pids)
+
+    # Not Activated and Visit Yet to Happen are scoped to sheet's Appointment Scheduled.
     not_act_pids = appt_pids - act_pids
     ytv_pids     = appt_pids - act_pids - resch_pids - denied_p_pids - na_pids
-
-    pnm_activated       = len(act_pids)
-    rescheduled         = len(resch_pids)
-    denied_pnm          = len(denied_p_pids)
-    not_available       = len(na_pids)
     not_activated_count = len(not_act_pids)
     yet_to_visit        = len(ytv_pids)
 
