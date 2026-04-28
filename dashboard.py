@@ -72,22 +72,21 @@ def fetch_sheet(sheet_id, gcp_creds):
     sheet  = client.open_by_key(sheet_id).sheet1
 
     col_a = sheet.col_values(1)[1:]   # Partner IDs
-    col_n = sheet.col_values(15)[1:]  # Calling status (column O)
-    col_p = sheet.col_values(16)[1:]  # PSH Remark
+    col_p = sheet.col_values(16)[1:]  # Calling status (Remarks Dropdown — column P)
 
-    # Pad col_n to col_a length so partners at the bottom with blank status are not dropped
-    if len(col_n) < len(col_a):
-        col_n += [""] * (len(col_a) - len(col_n))
+    # Pad col_p to col_a length so partners at the bottom with blank status are not dropped
+    if len(col_p) < len(col_a):
+        col_p += [""] * (len(col_a) - len(col_p))
 
-    col_n = ["Appointment Scheduled" if v == "Appointment Confirmed" else v for v in col_n]
+    col_p = ["Appointment Scheduled" if v == "Appointment Confirmed" else v for v in col_p]
 
     partner_calling = {}
-    for pid, status in zip(col_a, col_n):
+    for pid, status in zip(col_a, col_p):
         pid = str(pid).strip()
         if pid:
             partner_calling[pid] = status
 
-    return Counter(col_n), Counter(col_p), partner_calling
+    return Counter(col_p), Counter(col_p), partner_calling
 
 @st.cache_data(ttl=300)
 def fetch_userbase(metabase_url, api_key):
