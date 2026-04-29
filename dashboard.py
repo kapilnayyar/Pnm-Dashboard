@@ -202,13 +202,23 @@ def build(calling, railway, partner_calling, partner_activation, railway_all_pid
     # into the "Appointment Not Scheduled" breakdown without a code change.
     NOT_CONN_S = {"DNP", "Not Contactable"}
 
+    # PNM-stage statuses: partners are already past the calling stage and
+    # tracked in the Railway/PNM dashboard. They stay counted in Connected
+    # but are hidden from the "Appointment Not Scheduled" breakdown so they
+    # don't muddy the "why didn't this partner schedule" view.
+    EXCLUDED_FROM_BREAKDOWN = {
+        "Denied/Already Denied in PNM Dashboard",
+        "Denied After Visit",
+    }
+
     all_pids        = set(partner_calling.keys())
     not_conn_pids   = {pid for pid, s in partner_calling.items() if s in NOT_CONN_S}
     connected_pids  = {pid for pid, s in partner_calling.items() if s and s not in NOT_CONN_S}
+    excluded_pids   = {pid for pid, s in partner_calling.items() if s in EXCLUDED_FROM_BREAKDOWN}
     called_pids     = connected_pids | not_conn_pids
     not_called_pids = all_pids - called_pids
     appt_pids       = {pid for pid, s in partner_calling.items() if s == "Appointment Scheduled"}
-    not_sched_pids  = connected_pids - appt_pids
+    not_sched_pids  = connected_pids - appt_pids - excluded_pids
     dnp_pids        = {pid for pid, s in partner_calling.items() if s == "DNP"}
     nc_pids         = {pid for pid, s in partner_calling.items() if s == "Not Contactable"}
 
@@ -217,13 +227,17 @@ def build(calling, railway, partner_calling, partner_activation, railway_all_pid
     calls_made    = connected + not_connected
     not_called    = ELIGIBLE - calls_made
     appt_sched    = len(appt_pids)
-    not_sched     = connected - appt_sched
+    not_sched     = len(not_sched_pids)
 
     # Dynamic breakdown of "Appointment Not Scheduled (from Connected)":
     # group not_sched_pids by their column-P value and sort by count descending.
+    # "Denied" is shown as "Denied(Call+Visit)" to disambiguate from the
+    # PNM-stage Denied statuses filtered out above.
     ns_groups = {}
     for pid in not_sched_pids:
-        ns_groups.setdefault(partner_calling[pid], set()).add(pid)
+        raw = partner_calling[pid]
+        label = "Denied(Call+Visit)" if raw == "Denied" else raw
+        ns_groups.setdefault(label, set()).add(pid)
     ns_breakdown = sorted(
         [(label, len(pids), ub(pids, userbase_map)) for label, pids in ns_groups.items()],
         key=lambda x: x[1],
