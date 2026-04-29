@@ -193,41 +193,39 @@ def ub_fmt(total):
 def build(calling, railway, partner_calling, partner_activation, railway_all_pids, userbase_map):
     ELIGIBLE = 1201
 
-    CONNECTED_S = {
-        "Appointment Scheduled", "Call Back Later", "Denied",
-        "Out of Town", "Px Asking Details on Mail", "Wrong Number",
-        "Shifted to Other Partner", "Window Shut down"
-    }
+    # Only DNP / Not Contactable are explicitly carved out as "Not Connected".
+    # Everything else with a non-blank column-P value is "Connected" — including
+    # any new dropdown value Ops adds in future, which then automatically rolls
+    # into the "Appointment Not Scheduled" breakdown without a code change.
     NOT_CONN_S = {"DNP", "Not Contactable"}
 
-    connected     = sum(calling[k] for k in CONNECTED_S)
-    not_connected = sum(calling[k] for k in NOT_CONN_S)
-    calls_made    = connected + not_connected
-    not_called    = ELIGIBLE - calls_made
-
-    appt_sched    = calling["Appointment Scheduled"]
-    not_sched     = connected - appt_sched
-
-    # Activation row counts will be derived below by intersecting Railway sets
-    # with the sheet's Appointment Scheduled pool, since the activation rows are
-    # labelled "(from Appointment Scheduled)".
-
     all_pids        = set(partner_calling.keys())
-    called_pids     = {pid for pid, s in partner_calling.items() if s in (CONNECTED_S | NOT_CONN_S)}
-    not_called_pids = all_pids - called_pids
-    conn_pids       = {pid for pid, s in partner_calling.items() if s in CONNECTED_S}
     not_conn_pids   = {pid for pid, s in partner_calling.items() if s in NOT_CONN_S}
+    connected_pids  = {pid for pid, s in partner_calling.items() if s and s not in NOT_CONN_S}
+    called_pids     = connected_pids | not_conn_pids
+    not_called_pids = all_pids - called_pids
     appt_pids       = {pid for pid, s in partner_calling.items() if s == "Appointment Scheduled"}
-    not_sched_pids  = conn_pids - appt_pids
-    cbl_pids        = {pid for pid, s in partner_calling.items() if s == "Call Back Later"}
-    denied_c_pids   = {pid for pid, s in partner_calling.items() if s == "Denied"}
-    oot_pids        = {pid for pid, s in partner_calling.items() if s == "Out of Town"}
-    shifted_pids    = {pid for pid, s in partner_calling.items() if s == "Shifted to Other Partner"}
-    mail_pids       = {pid for pid, s in partner_calling.items() if s == "Px Asking Details on Mail"}
-    wrong_pids      = {pid for pid, s in partner_calling.items() if s == "Wrong Number"}
-    isp_pids        = {pid for pid, s in partner_calling.items() if s == "Window Shut down"}
+    not_sched_pids  = connected_pids - appt_pids
     dnp_pids        = {pid for pid, s in partner_calling.items() if s == "DNP"}
     nc_pids         = {pid for pid, s in partner_calling.items() if s == "Not Contactable"}
+
+    connected     = len(connected_pids)
+    not_connected = len(not_conn_pids)
+    calls_made    = connected + not_connected
+    not_called    = ELIGIBLE - calls_made
+    appt_sched    = len(appt_pids)
+    not_sched     = connected - appt_sched
+
+    # Dynamic breakdown of "Appointment Not Scheduled (from Connected)":
+    # group not_sched_pids by their column-P value and sort by count descending.
+    ns_groups = {}
+    for pid in not_sched_pids:
+        ns_groups.setdefault(partner_calling[pid], set()).add(pid)
+    ns_breakdown = sorted(
+        [(label, len(pids), ub(pids, userbase_map)) for label, pids in ns_groups.items()],
+        key=lambda x: x[1],
+        reverse=True,
+    )
 
     # PNM Activated, Rescheduled, Denied, Not Available — Railway raw values
     # (so they match the PNM/Railway dashboard exactly).
@@ -257,19 +255,13 @@ def build(calling, railway, partner_calling, partner_activation, railway_all_pid
         "eligible":        (ELIGIBLE,      ub(all_pids,        userbase_map)),
         "calls_made":      (calls_made,    ub(called_pids,     userbase_map)),
         "not_called":      (not_called,    ub(not_called_pids, userbase_map)),
-        "connected":       (connected,     ub(conn_pids,       userbase_map)),
+        "connected":       (connected,     ub(connected_pids,  userbase_map)),
         "not_connected":   (not_connected, ub(not_conn_pids,   userbase_map)),
-        "dnp":             (calling["DNP"],ub(dnp_pids,        userbase_map)),
-        "not_contactable": (calling["Not Contactable"],        ub(nc_pids,       userbase_map)),
+        "dnp":             (len(dnp_pids), ub(dnp_pids,        userbase_map)),
+        "not_contactable": (len(nc_pids),  ub(nc_pids,         userbase_map)),
         "appt_sched":      (appt_sched,    ub(appt_pids,       userbase_map)),
         "not_sched":       (not_sched,     ub(not_sched_pids,  userbase_map)),
-        "ns_cbl":          (calling["Call Back Later"],         ub(cbl_pids,      userbase_map)),
-        "ns_denied":       (calling["Denied"],                  ub(denied_c_pids, userbase_map)),
-        "ns_oot":          (calling["Out of Town"],             ub(oot_pids,      userbase_map)),
-        "ns_shifted":      (calling.get("Shifted to Other Partner", 0), ub(shifted_pids, userbase_map)),
-        "ns_mail":         (calling["Px Asking Details on Mail"], ub(mail_pids,   userbase_map)),
-        "ns_wrong":        (calling["Wrong Number"],             ub(wrong_pids,   userbase_map)),
-        "ns_isp":          (calling.get("Window Shut down", 0),      ub(isp_pids,     userbase_map)),
+        "ns_breakdown":    ns_breakdown,
         "pnm_activated":   (pnm_activated,                      ub_fmt(act_ub)),
         "not_activated":   (not_activated_count,                ub_fmt(not_act_ub)),
         "yet_to_visit":    (yet_to_visit,                       ub_fmt(ytv_ub)),
@@ -358,13 +350,8 @@ def render():
 
     html += title_r("Appointment Scheduled  (from Connected)",     c("appt_sched"), u("appt_sched"), "#ED7D31", white_text=True)
     html += plain_r("Appointment Not Scheduled  (from Connected)", c("not_sched"),  u("not_sched"),  "#FCE4D6")
-    html += sub_r  ("Call Back Later",           c("ns_cbl"),     u("ns_cbl"),     "#FEF4EE")
-    html += sub_r  ("Denied",                    c("ns_denied"),  u("ns_denied"),  "#FEF4EE")
-    html += sub_r  ("Out of Town",               c("ns_oot"),     u("ns_oot"),     "#FEF4EE")
-    html += sub_r  ("Shifted to Other Partner",  c("ns_shifted"), u("ns_shifted"), "#FEF4EE")
-    html += sub_r  ("Asking Details on Mail",    c("ns_mail"),    u("ns_mail"),    "#FEF4EE")
-    html += sub_r  ("Wrong Number",              c("ns_wrong"),   u("ns_wrong"),   "#FEF4EE")
-    html += sub_r  ("Window Shut down",             c("ns_isp"),     u("ns_isp"),     "#FEF4EE")
+    for label, count, userbase in f["ns_breakdown"]:
+        html += sub_r(label, count, userbase, "#FEF4EE")
     html += gap_r()
 
     html += title_r("PNM Activated  (from Appointment Scheduled)", c("pnm_activated"), u("pnm_activated"), "#375623", white_text=True)
