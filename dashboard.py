@@ -4,6 +4,9 @@ import gspread
 from google.oauth2.service_account import Credentials
 from collections import Counter
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+IST = ZoneInfo("Asia/Kolkata")
 from streamlit_autorefresh import st_autorefresh
 import json
 import os
@@ -317,7 +320,7 @@ def render():
 
     f = build(calling, railway or {}, partner_calling, partner_activation, railway_all_pids or set(), userbase_map)
 
-    updated = datetime.now().strftime("%d-%b-%Y %H:%M")
+    updated = datetime.now(IST).strftime("%d-%b-%Y %H:%M")
 
     st.markdown(
         f'<div style="background:#1F3864;color:#ffffff;padding:12px;border-radius:6px;'
@@ -465,7 +468,7 @@ with col_download:
     st.download_button(
         label="⬇ Download Excel",
         data=_excel,
-        file_name=f"PNM_Activation_{datetime.now().strftime('%d%b%Y')}.xlsx",
+        file_name=f"PNM_Activation_{datetime.now(IST).strftime('%d%b%Y')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
