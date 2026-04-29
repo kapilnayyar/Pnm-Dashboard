@@ -378,7 +378,7 @@ def render():
     html += plain_r("Not Activated  (from Appointment Scheduled)", c("not_activated"), u("not_activated"), "#FFC7CE")
     html += sub_r  ("Visit Yet to Happen", c("yet_to_visit"), u("yet_to_visit"), "#FFE2E2")
     html += sub_r  ("Rescheduled",         c("rescheduled"),  u("rescheduled"),  "#FFE2E2")
-    html += sub_r  ("Denied",              c("denied_pnm"),   u("denied_pnm"),   "#FFE2E2")
+    html += sub_r  ("Denied(Call+Visit)",  c("denied_pnm"),   u("denied_pnm"),   "#FFE2E2")
     html += sub_r  ("Not Available",       c("not_available"),u("not_available"),"#FFE2E2")
 
     html += "</table>"
