@@ -395,6 +395,15 @@ st.markdown("""
 <style>
 [data-testid="stToolbar"] {visibility: hidden !important;}
 [data-testid="stDecoration"] {display: none !important;}
+[data-testid="stStatusWidget"] {display: none !important;}
+[data-testid="stDeployButton"] {display: none !important;}
+[data-testid="manage-app-button"] {display: none !important;}
+.stDeployButton {display: none !important;}
+.stAppDeployButton {display: none !important;}
+.viewerBadge_container__1QSob {display: none !important;}
+.viewerBadge_link__1S137 {display: none !important;}
+.styles_viewerBadge__1yB5_ {display: none !important;}
+a[href^="https://streamlit.io"] {display: none !important;}
 footer {visibility: hidden !important;}
 #MainMenu {visibility: hidden !important;}
 </style>
