@@ -81,6 +81,9 @@ def fetch_sheet(sheet_id, gcp_creds):
     if len(col_p) < len(col_a):
         col_p += [""] * (len(col_a) - len(col_p))
 
+    # Strip whitespace so equality checks against dropdown values work even
+    # when sheet entries have stray spaces (common with manual data entry).
+    col_p = [str(v).strip() for v in col_p]
     col_p = ["Appointment Scheduled" if v == "Appointment Confirmed" else v for v in col_p]
 
     partner_calling = {}
